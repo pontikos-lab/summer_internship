@@ -98,6 +98,12 @@ zip_1000 <- batrips[, n_zip_code := .N, by = zip_code][n_zip_code > 1000][, n_zi
 
 
 
+library(data.table)
+library(ggplot2)
+DT <- fread("chr14_variants.vcf.gz")
 
+
+DT <- fread("example.vcf.gz")
+plot(DT$, DT$)
 
 
