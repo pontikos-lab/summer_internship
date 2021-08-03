@@ -1,0 +1,173 @@
+install.packages("httpgd")
+install.packages("stringr")
+install.packages("gridExtra")
+
+R
+library(httpgd)
+library(data.table)
+library(ggplot2)
+library(stringr)
+library(gridExtra)
+library(grid)
+setwd('/home/jovena/internship/vcf_files')
+DT <- fread("chr14_variants.vcf.gz")
+str(DT)
+hgd()
+
+
+# ignore
+b <- DT[, HG00096]
+barplot(table(b))
+
+hits_00 <- grepl("0|0", b, fixed = TRUE)
+s1 <- sum(hits_00, na.rm = TRUE) #2420768 
+hits_01 <- grepl("0|1", b, fixed = TRUE)
+s2 <- sum(hits_01, na.rm = TRUE) #41410
+hits_11 <- grepl("1|1", b, fixed = TRUE)
+s3 <- sum(hits_11, na.rm = TRUE) #48137
+sum(s1, s2, s3) #2510315
+genotype <- as.factor(c("0|0", "0|1", "1|1"))
+freq <- c(s1,s2,s3)
+plot(genotype, freq)
+
+
+a <- DT[POS == 16038675]
+a <- a[, (1:9) := NULL]
+ncol(a) #2548
+ncol(DT) #2557
+
+hits_00 <- grepl("0|0", a, fixed = TRUE)
+s1 <- sum(hits_00, na.rm = TRUE) #2347
+hits_01 <- grepl("0|1", a, fixed = TRUE)
+s2 <- sum(hits_01, na.rm = TRUE) #91
+hits_11 <- grepl("1|1", a, fixed = TRUE)
+s3 <- sum(hits_11, na.rm = TRUE) #30
+sum(s1, s2, s3) #2468
+
+genotype <- as.factor(c("0|0", "0|1", "1|1"))
+freq <- c(s1,s2,s3)
+plot(genotype, freq)
+
+sample_names <- as.vector(read.csv("sample_names.csv", header=F)$V1)
+head(sample_names)
+
+c <- DT[, (sample_names)]
+
+- d1 = dat[, (.N-2548)]
+ggplot(d1, aes(x=genotype, y=freq, colour = sample_names)) + geom_point()
+
+
+- Another option to get counts of each of the different options in this column (but not sure how the table function fares for massive data): `table(DT[POS == 16038675, HG00114])`
+- grepl(), which returns TRUE when a pattern is found in the corresponding character string.
+  - grepl assumes that the input is a regular expression - so "0|1" means search for "0" or a "1" and not "0|1". You can use `fixed=TRUE` option - which will tell grepl that the input is not a regular expression
+  - `stringr` library can be faster
+- grep(), which returns a vector of indices of the character strings that contains the pattern.
+- Stop hgd() server with: dev.off()
+
+
+# data table
+head(DT$INFO)
+tstrsplit(head(DT$INFO),split=";")
+tstrsplit(head(DT$INFO),split=";")[[1]]
+
+- `gsub(pattern, replacement, x)`
+gsub("AC=", "", tstrsplit(head(DT$INFO),split=";")[[1]])
+as.numeric(gsub("AC=", "", tstrsplit(head(DT$INFO),split=";")[[1]]))
+
+.Last.value
+hist(.Last.value)
+as.numeric(gsub("AC=", "", tstrsplit(DT$INFO,split=";")[[1]]))
+output <- as.numeric(gsub("AC=", "", tstrsplit(DT$INFO,split=";")[[1]]))
+hist(output)
+length(output) #2548903
+
+DT[, AC := output]
+
+
+- DT[DT == "0|0"] <- 0
+
+info_split <- tstrsplit(DT$INFO, split=";")
+length(info_split) #2548903
+head(info_split)
+
+gsub("AC=", "", info_split)
+length(info_split[[1]])
+dim(DT) #2548903  2557
+
+
+info_AC <- as.numeric(gsub("AC=", "", info_split[[1]]))
+info_AN <- as.numeric(gsub("AN=", "", info_split[[2]]))
+info_DP <- as.numeric(gsub("DP=", "", info_split[[3]]))
+info_AF <- as.numeric(gsub("AF=", "", info_split[[4]]))
+info_EAS_AF <- as.numeric(gsub("EAS_AF=", "", info_split[[5]]))
+info_EUR_AF <- as.numeric(gsub("EUR_AF=", "", info_split[[6]]))
+info_AFR_AF <- as.numeric(gsub("AFR_AF=", "", info_split[[7]]))
+info_AMR_AF <- as.numeric(gsub("AMR_AF=", "", info_split[[8]]))
+info_SAS_AF <- as.numeric(gsub("SAS_AF=", "", info_split[[9]]))
+# last 2 aren't numeric `table(info_split[[10]])`
+info_VT <- gsub("VT=", "", info_split[[10]])
+info_NS <- gsub("NS=", "", info_split[[11]])
+
+
+# make a loop ?
+info_types <- c("AC", "AN", "DP", "AF", "EAS_AF", "EUR_AF", "AFR_AF", "AMR_AF", "SAS_AF", "VT", "NS")
+
+
+# regular plots
+par(mfrow = c(3,4))
+hist(info_AC)
+hist(info_AN) # or barplot(table(info_AN)) ?
+hist(info_DP)
+hist(info_AF)
+hist(info_EAS_AF)
+hist(info_EUR_AF)
+hist(info_AFR_AF)
+hist(info_AMR_AF)
+hist(info_SAS_AF)
+barplot(table(info_split[[10]]))
+barplot(table(info_split[[11]]))
+
+
+# ggplot
+DT_info <- DT[, `:=` (info_AC=info_AC, info_AN=info_AN, info_DP=info_DP, info_AF=info_AF, info_EAS_AF=info_EAS_AF, info_EUR_AF=info_EUR_AF, info_AFR_AF=info_AFR_AF, info_AMR_AF=info_AMR_AF, info_SAS_AF=info_SAS_AF, info_VT=info_VT, info_NS=info_NS)]
+
+p <- ggplot(DT_info, aes(x=info_AC)) + geom_histogram()
+p + facet_grid(rows=?)
+
+p1 <- ggplot(DT_info, aes(x=info_AC)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of AC", x ="AC", y = "Frequency") + theme(plot.title = element_text(hjust = 0.5))
+p2 <- ggplot(DT_info, aes(x=info_AN)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of AN", x ="AN", y = "Frequency")
+p3 <- ggplot(DT_info, aes(x=info_DP)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of DP", x ="DP", y = "Frequency")
+p4 <- ggplot(DT_info, aes(x=info_AF)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of AF", x ="AF", y = "Frequency")
+p5 <- ggplot(DT_info, aes(x=info_EAS_AF)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of EAS_AF", x ="EAS_AF", y = "Frequency")
+p6 <- ggplot(DT_info, aes(x=info_EUR_AF)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of EUR_AF", x ="EUR_AF", y = "Frequency")
+p7 <- ggplot(DT_info, aes(x=info_AFR_AF)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of AFR_AF", x ="AFR_AF", y = "Frequency")
+p8 <- ggplot(DT_info, aes(x=info_AMR_AF)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of AMR_AF", x ="AMR_AF", y = "Frequency")
+p9 <- ggplot(DT_info, aes(x=info_SAS_AF)) + geom_histogram(color="black", fill="darkblue") + labs(title="Histogram of SAS_AF", x ="SAS_AF", y = "Frequency")
+p10 <- ggplot(DT_info, aes(x=info_VT)) + geom_bar(fill="darkblue") + labs(title="Barplot of VT", x ="VT", y = "Frequency")
+p11 <- ggplot(DT_info, aes(x=info_NS)) + geom_bar(fill="darkblue") + labs(title="Barplot of NS", x ="NS", y = "Frequency")
+
+require(gridExtra)
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11, nrow=3, ncol=4, top = textGrob("Plots of site-level annotations",gp=gpar(fontsize=20)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# DT_info w/ 0 1 2 alleles
+DT_1 <- str_replace_all(DT_info, "0|0", "0")
+
+
+
+
+DTE[, DTE := str_replace_all(DTE, "0|0", "0")]
+erase cols 1:9 ?
+10:.N
