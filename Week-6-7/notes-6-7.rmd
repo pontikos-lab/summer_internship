@@ -1,6 +1,4 @@
-install.packages("httpgd")
-install.packages("stringr")
-install.packages("gridExtra")
+install.packages(c("httpgd", "stringr", "gridExtra"))
 
 R
 library(httpgd)
@@ -8,7 +6,6 @@ library(data.table)
 library(ggplot2)
 library(stringr)
 library(gridExtra)
-library(grid)
 setwd('/home/jovena/internship/vcf_files')
 DT <- fread("chr14_variants.vcf.gz")
 str(DT)
@@ -83,9 +80,6 @@ length(output) #2548903
 
 DT[, AC := output]
 
-
-- DT[DT == "0|0"] <- 0
-
 info_split <- tstrsplit(DT$INFO, split=";")
 length(info_split) #2548903
 head(info_split)
@@ -151,23 +145,18 @@ grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11, nrow=3, ncol=4, top = textGrob(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 # DT_info w/ 0 1 2 alleles
-DT_1 <- str_replace_all(DT_info, "0|0", "0")
 
+DTE <- fread("example.vcf.gz")
+DTE[DTE == "0|0"] <- 0
+DTE[DTE == "0|1"] <- 1
+DTE[DTE == "1|0"] <- 1
+DTE[DTE == "1|1"] <- 2
 
+DT[DT == "0|0"] <- 0
+DT[DT == "0|1"] <- 1
+DT[DT == "1|0"] <- 1
+DT[DT == "1|1"] <- 2
 
-
-DTE[, DTE := str_replace_all(DTE, "0|0", "0")]
-erase cols 1:9 ?
-10:.N
+save(DT, file="DT_file")
+load("DT_file")

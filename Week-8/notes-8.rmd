@@ -1,0 +1,130 @@
+# PCA
+
+- Principal components analysis: Finds linear combinations of the observations w/ maximum variance
+- PCA is often used to find clusters of individuals based on their genotypes
+- If X is a matrix of SNP genotype dosages (n individuals × p SNPs) then we compute: 
+  - n × n Variance/Correlation matrix V of relationships btwn each pair of individuals
+  - Projecting onto the first few principal components (eigenvectors of V) often reveals population structure
+
+
+- Perform PCA in R with `p=prcomp(m,retx=TRUE)`, or `princomp()`
+- Eigenvalues `p$sdev^2`
+- Column eigenvectors `p$rotation`
+- Row eigenvectors `p$x`
+
+
+- Background:
+  - If X is an n × p data matrix, then the n × n variance-covariance matrix 
+  - Or, if has been scaled X → W so that each column of W has mean 0 and variance 1
+    - then the n × n correlation matrix is C = WW’
+- The eigen decomposition e=eigenc(C) gives the:
+  - Eigenvectors e$vectors : principal components
+  - Eigenvalues e$values : their variances
+- The n × n matrix e$vectors is an orthogonal matrix because the PCs are orthogonal to each other
+- They define a new coordinate system such that the first PC contains the maximum variance explainable by any combination of variables
+- The principal components with smallest eigenvalues also give useful data
+  - They define combinations of variables that are tightly collinear
+
+- PCA: Data Matrix
+  - In R, p=prcomp(W) resembles eigen(C), except it takes a rectangular data matrix instead of a square variance matrix
+    - W = UΛV; U,V orthogonal: V′V = I
+    - C = WW′ = UΛVV′ΛU′ = UΛ2U′
+  - Vector `p$sdev ≡ sqrt(e$values)` contains square roots of the variances
+  - Matrix p$rotation = right eigenvectors
+    - PCs: Combinations of columns with big/small variances
+- Matrix p$x ≡ e$vectors = left eigenvectors
+  - Projections of individuals onto PCs
+- Different algorithms used by eigen(), prcomp() , giving differences in the eigenvectors - sometimes pointing in opposite directions (eigenvalues are more similar)
+  - princomp() does essentially the same as prcomp - can ignore it
+
+
+- Interpretation of Principal Components
+  - PCs with high % variance indicate good linear combinations of the data that capture lots of variation
+  - These PCs can be used for low-dimension approximations:
+    - Projections of individuals onto these components may reveal clusters
+    - e.g. PC1 (20%) involves a weighted average of sex, weight, urea, tryglycerides, protein, cholesterol, Na, low-, high- density lipoproteins, Cl and Ca
+    - PCs with low % variance indicate combinations of variables that are highly collinear and constrained (maybe throw out as not important)
+    - e.g. PC20 (<1%) contrasts cholesterol, Ca and Cl vs Na, HLD, LDL and Albumin
+
+
+#### E.g. PCA of the Mouse Biochemistry Data matrix
+
+1. Read in the data, recode GENDER to be numeric, remove any non-numeric columns and also those columns with more than 20% missing values, and remove any reminaing rows with missing values.
+```{r 1}
+R
+library(httpgd)
+hgd()
+setwd('/home/jovena/internship/summer_internship/Week-8')
+m <- read.delim("mouse.biochem.txt")
+m$Male = ifelse( m$GENDER=="M", 1, 0 )
+m = m[, ! (names(m) %in% c("Date.StudyDay","Date.Year","Date.Month"))]
+w = sapply(1:ncol(m),function(i,m) { 
+  is.numeric(m[,i]) & mean(is.na(m[,i]))<0.2},m)
+mm = m[,w]
+mm = scale(mm[complete.cases(mm),])
+```
+
+2. Perform PCA using prcomp().
+```{r 2}
+p = prcomp(mm, retx = T)
+
+v = p$sdev^2 # eigenvalues (variance, or the SS(distances))
+pv = 100*v/sum(v) # % of variance explained by each PC
+barplot(pv,xlab="PC", ylab="% variance", ylim=c(0,20))
+
+par(mar=par("mar")+ c(2,4,0,0))
+k = p$rotation # column eigenvectors
+pvs = sprintf("%s %.0f %s",colnames(k),pv,"%")
+
+fields::image.plot(k,xaxt="n",yaxt="n") 
+axis(1, at=seq(0,1,length.out=ncol(k)), labels=pvs, las=2, cex.axis=0.5)
+axis(2, at=seq(0,1,length.out=nrow(k)), labels=rownames(k), las=2, cex.axis=0.5)
+# PC1 has the largest sum of squared distances
+# Eigenvectors for each PC are 1 unit long (talking about linear combination)
+```
+
+3. Plot the individual mice projected onto the first three principle components. Colour the mice according to sex.
+```{r 3}
+# p$x = row eigenvectors
+par(mfrow=c(2,2))
+plot( p$x[,1],p$x[,2], xlab=pvs[1], ylab=pvs[2]) 
+points(p$x[mm[,"Male"]>0,1],p$x[mm[,"Male"]>0,2],col="red") # colour
+
+plot(p$x[,3],p$x[,4], xlab=pvs[3], ylab=pvs[4]) 
+points(p$x[mm[,"Male"]>0,3],p$x[mm[,"Male"]>0,4],col="red")
+```
+
+4. Test if male and female mice have different projections onto PC1 and PC2
+```{r 4}
+#4
+t.test(p$x[mm[,"Male"]>0,1],p$x[mm[,"Male"]<0,1])
+
+t.test(p$x[mm[,"Male"]>0,2],p$x[mm[,"Male"]<0,2])
+```
+
+1. Repeat the PCA this time excluding sex from the measures used in the PCA, to see if male and female mice are distinguishable based on biochemical mesuares alone.
+```{r 5}
+#5
+w = which(colnames(mm)=="Male") 
+gender = mm[,"Male"]>0
+mm = mm[,-w]
+dim(mm)
+
+p = prcomp(mm,retx=TRUE) 
+v = p$sdev^2
+pv = 100*v/sum(v)
+k = p$rotation
+pvs = sprintf("%s %.0f %s",colnames(k),pv,"%")
+
+par(mfrow=c(2,2)) 
+barplot(pv,xlab="PC", ylab="% variance", ylim=c(0,20), main="PCs without GENDER")
+
+plot( p$x[,1],p$x[,2], xlab=pvs[1], ylab=pvs[2],pch=20,cex=0.3)
+points(p$x[gender,1],p$x[gender,2],col="red",pch=20,cex=0.3) 
+
+plot(p$x[,3],p$x[,4], xlab=pvs[3], ylab=pvs[4],pch=20,cex=0.3)
+points(p$x[gender,3],p$x[gender,4],col="red",pch=20,cex=0.3) 
+
+t.test(p$x[gender,1],p$x[!gender,1])
+# We see that indeed, males and females are still readily distinguished by biochemical measures alone.
+```
