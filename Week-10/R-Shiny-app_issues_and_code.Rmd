@@ -1,0 +1,460 @@
+#1 Allow mutiple curves/eyes to be plotted on one plot
+
+```{r}
+library(shiny)
+library(rstpm2)
+library(dplyr)
+model <- readRDS("model.rds")
+
+ui <- fluidPage(
+  fluidRow(
+    column(6,
+           h4("Curve 1 (blue)"),
+             sliderInput("age",
+                "Age at first presentation",
+                min = 13,
+                max = 66,
+                value = 20),
+             sliderInput("kmax",
+                "Kmax",
+                min = 39,
+                max = 82,
+                value = 54),
+             sliderInput("front_k1",
+                "Front K1",
+                min = 33,
+                max = 61,
+                value = 45),
+             sliderInput("tpt",
+                "Pachymetry",
+                min = 312,
+                max = 605,
+                value = 462),
+           ),
+    column(6,
+           h4("Curve 2 (red)"),
+             sliderInput("age_2",
+                "Age at first presentation",
+                min = 13,
+                max = 66,
+                value = 20),
+             sliderInput("kmax_2",
+                "Kmax",
+                min = 39,
+                max = 82,
+                value = 54),
+             sliderInput("front_k1_2",
+                "Front K1",
+                min = 33,
+                max = 61,
+                value = 45),
+             sliderInput("tpt_2",
+                "Pachymetry",
+                min = 312,
+                max = 605,
+                value = 462),
+             ),
+    mainPanel(fluidRow(
+             column(12,
+                    plotOutput("surv")))
+             )
+    )
+)
+
+server <- function(input, output) {
+  
+  output$surv <- renderPlot({
+    plot(model,newdata=data.frame(age_baseline=input$age,kmax=input$kmax,front_k1=input$front_k1,tpt2=input$tpt/10),ci=TRUE,rug=FALSE,line.col='blue',ylim = c(0,1),xlab="Years since first appointment",ylab="Probability of not having CXL")
+    lines(model,newdata=data.frame(age_baseline=input$age_2,kmax=input$kmax_2,front_k1=input$front_k1_2,tpt2=input$tpt_2/10),ci=TRUE,rug=FALSE,col='red')
+  })
+}
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+new plot?
+```{r}
+eye_data <- read.csv("unmerged_cxl_pseudo.csv")
+
+
+
+
+```
+
+
+
+#9 Make it so the front K1 slider cannot be larger than KMax
+
+```{r}
+library(shiny)
+library(rstpm2)
+library(dplyr)
+model <- readRDS("model.rds")
+
+ui <- fluidPage(
+  fluidRow(
+    column(6,
+           h4("Curve 1 (blue)"),
+             sliderInput("age",
+                "Age at first presentation",
+                min = 13,
+                max = 66,
+                value = 20),
+             sliderInput("kmax",
+                "Kmax",
+                min = 39,
+                max = 82,
+                value = 54),
+             sliderInput("front_k1",
+                "Front K1",
+                min = 33,
+                max = 61,
+                value = 45),
+             sliderInput("tpt",
+                "Pachymetry",
+                min = 312,
+                max = 605,
+                value = 462),
+           ),
+    column(6,
+           h4("Curve 2 (red)"),
+             sliderInput("age_2",
+                "Age at first presentation",
+                min = 13,
+                max = 66,
+                value = 20),
+             sliderInput("kmax_2",
+                "Kmax",
+                min = 39,
+                max = 82,
+                value = 54),
+             sliderInput("front_k1_2",
+                "Front K1",
+                min = 33,
+                max = 61,
+                value = 45),
+             sliderInput("tpt_2",
+                "Pachymetry",
+                min = 312,
+                max = 605,
+                value = 462),
+             ),
+    mainPanel(fluidRow(
+             column(12,
+                    plotOutput("surv")))
+             )
+    )
+)
+
+server <- function(input, output, session) {
+
+  observeEvent(input$front_k1, {
+    if (input$front_k1 > input$kmax) {
+      updateSliderInput(session, "front_k1", value = input$kmax)
+    }
+  })
+  observeEvent(input$kmax, {
+    if (input$kmax < input$front_k1 ) {
+      updateSliderInput(session, "front_k1", value = input$kmax)
+    }
+  })
+
+    observeEvent(input$front_k1_2, {
+    if (input$front_k1_2 > input$kmax_2) {
+      updateSliderInput(session, "front_k1_2", value = input$kmax_2)
+    }
+  })
+  observeEvent(input$kmax_2, {
+    if (input$kmax_2 < input$front_k1_2 ) {
+      updateSliderInput(session, "front_k1_2", value = input$kmax_2)
+    }
+  })
+  
+  output$surv <- renderPlot({
+    plot(model,newdata=data.frame(age_baseline=input$age,kmax=input$kmax,front_k1=input$front_k1,tpt2=input$tpt/10),ci=TRUE,rug=FALSE,line.col='blue',ylim = c(0,1),xlab="Years since first appointment",ylab="Probability of not having CXL")
+    lines(model,newdata=data.frame(age_baseline=input$age_2,kmax=input$kmax_2,front_k1=input$front_k1_2,tpt2=input$tpt_2/10),ci=TRUE,rug=FALSE,col='red')
+  })
+
+}
+shinyApp(ui = ui, server = server)
+
+```
+
+```{r}
+library(shiny)
+library(rstpm2)
+library(plotly)
+
+model <- readRDS("model.rds")
+
+produce_plot_data <- function(model, age_baseline, kmax, front_k1, tpt2, colour="#02A9EA", name = "Curve 1", reverse_prob_direction = FALSE) {
+  new_data <- data.frame(age_baseline=age_baseline, kmax=kmax, front_k1=front_k1, tpt2=tpt2/10)
+  dt <- predict(model, newdata=new_data, grid=TRUE, full=TRUE, se.fit=TRUE, ci=TRUE, rug=FALSE)
+  dt$colours <- factor(colour)
+  dt$names <- factor(name)
+  if (identical(reverse_prob_direction, FALSE)) {
+    dt$Estimate <- 1 - dt$Estimate 
+  }
+  return(dt)
+}
+
+ui <- fixedPage(
+  fixedRow(
+    column(6,
+           h4("Curve 1 (blue)", style="color: #02A9EA;"),
+           sliderInput("age", "Age at first presentation",
+                       min = 13, max = 66, value = 20, width = "100%"),
+           sliderInput("kmax", "Kmax",
+                       min = 39, max = 82, value = 54, width = "100%"),
+           sliderInput("front_k1", "Front K1",
+                       min = 33, max = 61, value = 45, width = "100%"),
+           sliderInput("tpt", "Pachymetry",
+                       min = 312, max = 605, value = 462, width = "100%"),
+    ),
+    column(6,
+           h4("Curve 2 (red)", style="color: #EE4266;"),
+           sliderInput("age_2", "Age at first presentation",
+                       min = 13, max = 66, value = 20, width = "100%"),
+           sliderInput("kmax_2", "Kmax",
+                       min = 39, max = 82, value = 54, width = "100%"),
+           sliderInput("front_k1_2", "Front K1",
+                       min = 33, max = 61, value = 45, width = "100%"),
+           sliderInput("tpt_2", "Pachymetry",
+                       min = 312, max = 605, value = 462, width = "100%"),
+    )
+  ),
+  fixedRow(column(12, plotlyOutput("plotly_plot"))),
+)
+
+server <- function(input, output, session) {
+  
+  observeEvent(input$front_k1, {
+    if (input$front_k1 > input$kmax) {
+      updateSliderInput(session, "front_k1", value = input$kmax)
+    }
+  })
+  observeEvent(input$kmax, {
+    if (input$kmax < input$front_k1 ) {
+      updateSliderInput(session, "front_k1", value = input$kmax)
+    }
+  })
+
+    observeEvent(input$front_k1_2, {
+    if (input$front_k1_2 > input$kmax_2) {
+      updateSliderInput(session, "front_k1_2", value = input$kmax_2)
+    }
+  })
+  observeEvent(input$kmax_2, {
+    if (input$kmax_2 < input$front_k1_2 ) {
+      updateSliderInput(session, "front_k1_2", value = input$kmax_2)
+    }
+  })
+  
+  output$plotly_plot <- renderPlotly({
+    dt1 <- produce_plot_data(model, input$age, input$kmax, input$front_k1, input$tpt, '#02A9EA', "Curve 1")
+    dt2 <- produce_plot_data(model, input$age_2, input$kmax_2, input$front_k1_2, input$tpt_2, '#EE4266', "Curve 2")
+    dt <- rbind(dt1, dt2)
+    g <- ggplot(dt, aes(x = period, y = Estimate, ymin = lower, ymax = upper, group = names))
+    g <- g + geom_ribbon(fill = "grey80", alpha = 0.8)
+    g <- g + geom_line(aes(colour = names))
+    g <- g + scale_y_continuous(limits=c(0,1))
+    g <- g + scale_color_manual(values = levels(dt$colours), labels = levels(dt$names))
+    g <- g + labs(x = "Years since first appointment", y = "Probability of not having CXL")
+    ggplotly(g)
+  })
+}
+
+shinyApp(ui = ui, server = server)
+
+```
+
+example
+```{r}
+library(shiny)
+ui <- fluidPage(
+  titlePanel("Test"),
+  sidebarLayout(
+    sidebarPanel(
+      sliderInput("Slider1", "Slider1", min = 1, max = 10, value = 5),
+      sliderInput("Slider2", "Slider2", min = 1, max = 10, value = 1)
+    ),
+    mainPanel(  )
+  )
+)
+server <- shinyServer(function(input, output, session) {
+
+  observeEvent(input$Slider2, {
+    if (input$Slider2 > input$Slider1) {
+      updateSliderInput(session, "Slider2", value = input$Slider1)
+    }
+  })
+
+  observeEvent(input$Slider1, {
+    if (input$Slider1 < input$Slider2 ) {
+      updateSliderInput(session, "Slider2", value = input$Slider1)
+    }
+  })  
+  
+})
+
+shinyApp(ui, server)
+```
+
+
+
+#5 Invert chart so that it display probability of progressing (easier to understand) 
+
+
+```{r}
+library(shiny)
+library(rstpm2)
+library(plotly)
+
+model <- readRDS("model.rds")
+
+produce_plot_data <- function(model, age_baseline, kmax, front_k1, tpt2, colour="#02A9EA", name = "Curve 1", reverse_prob_direction = FALSE) {
+  new_data <- data.frame(age_baseline=age_baseline, kmax=kmax, front_k1=front_k1, tpt2=tpt2/10)
+  dt <- predict(model, newdata=new_data, grid=TRUE, full=TRUE, se.fit=TRUE, ci=TRUE, rug=FALSE)
+  dt$colours <- factor(colour)
+  dt$names <- factor(name)
+  if (identical(reverse_prob_direction, FALSE)) {
+    dt$Estimate <- 1 - dt$Estimate 
+  }
+  return(dt)
+}
+
+ui <- fixedPage(
+  fixedRow(
+    column(6,
+           h4("Curve 1 (blue)", style="color: #02A9EA;"),
+           sliderInput("age", "Age at first presentation",
+                       min = 13, max = 66, value = 20, width = "100%"),
+           sliderInput("kmax", "Kmax",
+                       min = 39, max = 82, value = 54, width = "100%"),
+           sliderInput("front_k1", "Front K1",
+                       min = 33, max = 61, value = 45, width = "100%"),
+           sliderInput("tpt", "Pachymetry",
+                       min = 312, max = 605, value = 462, width = "100%"),
+    ),
+    column(6,
+           h4("Curve 2 (red)", style="color: #EE4266;"),
+           sliderInput("age_2", "Age at first presentation",
+                       min = 13, max = 66, value = 20, width = "100%"),
+           sliderInput("kmax_2", "Kmax",
+                       min = 39, max = 82, value = 54, width = "100%"),
+           sliderInput("front_k1_2", "Front K1",
+                       min = 33, max = 61, value = 45, width = "100%"),
+           sliderInput("tpt_2", "Pachymetry",
+                       min = 312, max = 605, value = 462, width = "100%"),
+    )
+  ),
+  
+  fixedRow(
+    actionButton("original", "Probability of having CXL"),
+    actionButton("inverted", "Probability of not having CXL"), 
+  ),
+  fixedRow(column(12, plotlyOutput("plotly_plot"))),
+)
+
+server <- function(input, output, session) {
+  
+  v <- reactiveValues(data = NULL)
+
+  observeEvent(input$original, {
+    output$plotly_plot <- renderPlotly({
+      dt1 <- produce_plot_data(model, input$age, input$kmax, input$front_k1, input$tpt, '#02A9EA', "Curve 1")
+      dt2 <- produce_plot_data(model, input$age_2, input$kmax_2, input$front_k1_2, input$tpt_2, '#EE4266', "Curve 2")
+      dt <- rbind(dt1, dt2)
+      g <- ggplot(dt, aes(x = period, y = Estimate, ymin = lower, ymax = upper, group = names))
+      g <- g + geom_line(aes(colour = names))
+      g <- g + scale_y_continuous(limits=c(0,1))
+      g <- g + scale_color_manual(values = levels(dt$colours), labels = levels(dt$names))
+      g <- g + labs(x = "Years since first appointment", y = "Probability of having CXL")
+      ggplotly(g)
+    })
+  })
+
+  observeEvent(input$inverted, {
+    output$plotly_plot <- renderPlotly({
+      dt1 <- produce_plot_data(model, input$age, input$kmax, input$front_k1, input$tpt, '#02A9EA', "Curve 1")
+      dt2 <- produce_plot_data(model, input$age_2, input$kmax_2, input$front_k1_2, input$tpt_2, '#EE4266', "Curve 2")
+      dt <- rbind(dt1, dt2)
+      g <- ggplot(dt, aes(x = period, y = (1 - Estimate), ymin = lower, ymax = upper, group = names))
+      g <- g + geom_line(aes(colour = names))
+      g <- g + scale_y_continuous(limits=c(0,1))
+      g <- g + scale_color_manual(values = levels(dt$colours), labels = levels(dt$names))
+      g <- g + labs(x = "Years since first appointment", y = "Probability of not having CXL")
+      ggplotly(g)
+    })
+  })  
+
+  
+  observeEvent(input$front_k1, {
+    if (input$front_k1 > input$kmax) {
+      updateSliderInput(session, "front_k1", value = input$kmax)
+    }
+  })
+  observeEvent(input$kmax, {
+    if (input$kmax < input$front_k1 ) {
+      updateSliderInput(session, "front_k1", value = input$kmax)
+    }
+  })
+
+  observeEvent(input$front_k1_2, {
+    if (input$front_k1_2 > input$kmax_2) {
+      updateSliderInput(session, "front_k1_2", value = input$kmax_2)
+    }
+  })
+  observeEvent(input$kmax_2, {
+    if (input$kmax_2 < input$front_k1_2 ) {
+      updateSliderInput(session, "front_k1_2", value = input$kmax_2)
+    }
+  })
+}  
+
+
+shinyApp(ui = ui, server = server)
+```
+
+
+example 
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  actionButton("runif", "Uniform"),
+  actionButton("rnorm", "Normal"), 
+  plotOutput("plot")
+)
+
+server <- function(input, output){
+  v <- reactiveValues(data = NULL)
+
+  observeEvent(input$runif, {
+    v$data <- runif(100)
+  })
+
+  observeEvent(input$rnorm, {
+    v$data <- rnorm(100)
+  })  
+
+  output$plot <- renderPlot({
+    if (is.null(v$data)) return()
+    hist(v$data)
+  })
+}
+
+shinyApp(ui, server)
+```
+
+
+
+
+
+
+
+
+
+

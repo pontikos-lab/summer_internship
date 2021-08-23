@@ -204,15 +204,20 @@ ui <- fluidPage(
 `actionButton("action", label = "Action")`
 https://shiny.rstudio.com/tutorial/written-tutorial/lesson3/
 
+- Hazard function
+- Royston-Parmar model
+- tpt: thinnest point thickness
+- period: follow up time 
+- status: whether or not they had CXL
 
 
+```
+setwd("/home/jovena/internship/RShinyCXL/shinyapp")
+library(rsconnect)
+rsconnect::deployApp()
+```
 
-
-
-
-
-
-
+- setwd("/home/jovena/internship/summer_internship/Week-9")
 
 
 
