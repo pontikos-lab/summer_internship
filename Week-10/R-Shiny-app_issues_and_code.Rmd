@@ -449,6 +449,262 @@ server <- function(input, output){
 shinyApp(ui, server)
 ```
 
+# Preselect action button
+
+example 1
+```{r}
+library(shiny)
+library(rsconnect)
+library(ggplot2)
+library(plotly)
+
+plotType <- function(data, x, y, type){
+  switch(type,
+         "Line" = ggplot(data, aes_string(x, y)) + geom_line(),
+         "Scatterplot" = ggplot(data, aes_string(x, y)) + geom_point()
+  )
+}
+
+ui <- fluidPage(  
+  
+  sidebarPanel(
+    # Input: select a file
+    fileInput(inputId = "file1", label = "Choose CSV File",
+              multiple = FALSE,
+              accept = c("text/csv",
+                         "text/comma-separated-values, text/plain",
+                         ".csv")
+    ),
+    # Horizontal line
+    tags$hr(),
+    # Input: Checkbox if file has header
+    checkboxInput("header", "Header", TRUE),
+    # Input: Select separator
+    radioButtons(inputId ="sep", label = "Separator",
+                 choices = c(Comma = ",",
+                             Semicolon = ";",
+                             Tab = "\t"),
+                 selected = ","),
+    
+    radioButtons(inputId = "quote", label = "Quote",
+                 choices = c(None = "",
+                             "Double Quote" = '"',
+                             "Single Quote" = "'"),
+                 selected = '"'),
+    # Horizontal line
+    tags$hr(),
+
+    selectInput('xcol', 'X Variable', ""),
+    selectInput('ycol', 'Y Variable', "", selected = ""),
+     # Horizontal line
+    tags$hr(),
+    # Input: Select the type of graph 
+    radioButtons(inputId ="graph", label = "Type of graph:",
+                 choices = c("Line", 
+                             "Scatterplot"),
+                 selected = "Line")
+  ),
+
+  mainPanel(
+    tabsetPanel( type = "tabs",
+                 tabPanel(
+                   # App title
+                   titlePanel("Uploading Files"),
+                   # Output: Data file
+                   tableOutput("contents")
+                   
+                 ),
+                 tabPanel(
+                   titlePanel("Plot"),
+                   plotOutput('MyPlot')
+                 ),
+                 tabPanel(
+                   titlePanel("Summary Statistics"),
+                   verbatimTextOutput("summary")
+                 )
+    )
+  )
+)
+
+server <- function(input, output, session) {
+
+  data <- reactive({
+    req(input$file1) 
+    
+    df <- read.csv(input$file1$datapath,
+                   header = input$header,
+                   sep = input$sep,
+                   quote = input$quote)
+    
+    updateSelectInput(session, inputId = 'xcol', label = 'X Variable',
+                      choices = names(df), selected = names(df)[sapply(df, is.numeric)])
+    updateSelectInput(session, inputId = 'ycol', label = 'Y Variable',
+                      choices = names(df), selected = names(df)[sapply(df, is.numeric)])
+    
+    return(df)
+    
+  })
+  
+  x_axe <- reactive({
+    data()[ , input$xcol]
+  })
+  
+  y_axe <- reactive({
+    data()[, input$ycol]
+  })
+  
+  style <- reactive({
+    input$graph
+  })
+  
+  output$contents <- renderTable({
+    data()
+  })
+  
+  output$MyPlot <- renderPlotly({
+    #x <- data()[, c(input$xcol, input$ycol)]
+    p <- plotType(data(), x_axe(),
+             y_axe(),
+             style())
+    p
+
+  })
+  
+  # Generate a summary table of the data uploaded
+  output$summary <- renderPrint({
+    y <- data()
+    summary(y)
+    
+  })
+  
+}
+
+# Create Shiny app
+shinyApp(ui = ui, server = server)
+
+```
+
+
+example 2
+```{r}
+ui <- fluidPage(
+  radioButtons("dist", "Distribution type:",
+               c("Normal" = "norm",
+                 "Uniform" = "unif",
+                 "Log-normal" = "lnorm",
+                 "Exponential" = "exp")),
+  plotOutput("distPlot")
+)
+
+server <- function(input, output) {
+  output$distPlot <- renderPlot({
+    dist <- switch(input$dist,
+                   norm = rnorm,
+                   unif = runif,
+                   lnorm = rlnorm,
+                   exp = rexp)
+
+    hist(dist(500))
+  })
+}
+
+shinyApp(ui, server)
+
+```
+
+real thing
+```{r}
+library(shiny)
+library(rstpm2)
+library(plotly)
+
+model <- readRDS("model.rds")
+
+produce_plot_data <- function(model, age_baseline, kmax, front_k1, tpt2, colour="#02A9EA", name = "Curve 1", reverse_prob_direction = FALSE) {
+  new_data <- data.frame(age_baseline=age_baseline, kmax=kmax, front_k1=front_k1, tpt2=tpt2/10)
+  dt <- predict(model, newdata=new_data, grid=TRUE, full=TRUE, se.fit=TRUE, ci=TRUE, rug=FALSE)
+  dt$colours <- factor(colour)
+  dt$names <- factor(name)
+  if (identical(reverse_prob_direction, FALSE)) {
+    dt$Estimate <- 1 - dt$Estimate 
+  }
+  return(dt)
+}
+
+ui <- fixedPage(
+  fixedRow(
+    column(6,
+           h4("Curve 1 (blue)", style="color: #02A9EA;"),
+           sliderInput("age", "Age at first presentation",
+                       min = 13, max = 66, value = 20, width = "100%"),
+           sliderInput("kmax", "Kmax",
+                       min = 39, max = 82, value = 54, width = "100%"),
+           sliderInput("front_k1", "Front K1",
+                       min = 33, max = 61, value = 45, width = "100%"),
+           sliderInput("tpt", "Pachymetry",
+                       min = 312, max = 605, value = 462, width = "100%"),
+    ),
+    column(6,
+           h4("Curve 2 (red)", style="color: #EE4266;"),
+           sliderInput("age_2", "Age at first presentation",
+                       min = 13, max = 66, value = 20, width = "100%"),
+           sliderInput("kmax_2", "Kmax",
+                       min = 39, max = 82, value = 54, width = "100%"),
+           sliderInput("front_k1_2", "Front K1",
+                       min = 33, max = 61, value = 45, width = "100%"),
+           sliderInput("tpt_2", "Pachymetry",
+                       min = 312, max = 605, value = 462, width = "100%"),
+    )
+  ),
+  
+  fixedRow(
+    radioButtons("type", "Probability of:",
+               c("having CXL" = "original",
+                 "not having CXL" = "inverted")),
+  ),
+  fixedRow(column(12, plotlyOutput("plotly_plot"))),
+)
+
+server <- function(input, output, session) {
+  
+  v <- reactiveValues(data = NULL)
+
+  observeEvent(input$front_k1, {
+    if (input$front_k1 > input$kmax) {
+      updateSliderInput(session, "front_k1", value = input$kmax)
+    }
+  })
+  observeEvent(input$kmax, {
+    if (input$kmax < input$front_k1 ) {
+      updateSliderInput(session, "front_k1", value = input$kmax)
+    }
+  })
+
+  observeEvent(input$front_k1_2, {
+    if (input$front_k1_2 > input$kmax_2) {
+      updateSliderInput(session, "front_k1_2", value = input$kmax_2)
+    }
+  })
+  observeEvent(input$kmax_2, {
+    if (input$kmax_2 < input$front_k1_2 ) {
+      updateSliderInput(session, "front_k1_2", value = input$kmax_2)
+    }
+  })
+  
+  output$plotly_plot <- renderPlotly({
+    dt1 <- produce_plot_data(model, input$age, input$kmax, input$front_k1, input$tpt, '#02A9EA', "Curve 1")
+    dt2 <- produce_plot_data(model, input$age_2, input$kmax_2, input$front_k1_2, input$tpt_2, '#EE4266', "Curve 2")
+    dt <- rbind(dt1, dt2)
+    type <- switch(input$type,
+         "original" = ggplot(dt, aes(x = period, y = (1 - Estimate), ymin = lower, ymax = upper, group = names)) + geom_line(aes(colour = names)) + scale_y_continuous(limits=c(0,1)) + scale_color_manual(values = levels(dt$colours), labels = levels(dt$names)) + labs(x = "Years since first appointment", y = "Probability of not having CXL"),
+         "inverted" = ggplotly(ggplot(dt, aes(x = period, y = Estimate, ymin = lower, ymax = upper, group = names)) + geom_line(aes(colour = names)) + scale_y_continuous(limits=c(0,1)) + scale_color_manual(values = levels(dt$colours), labels = levels(dt$names)) + labs(x = "Years since first appointment", y = "Probability of having CXL")
+         ))
+    ggplotly(type)
+  })
+}  
+
+shinyApp(ui = ui, server = server)
+```
 
 
 
