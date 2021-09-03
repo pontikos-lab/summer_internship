@@ -620,7 +620,7 @@ library(plotly)
 
 model <- readRDS("model.rds")
 
-produce_plot_data <- function(model, age_baseline, kmax, front_k1, tpt2, colour="#02A9EA", name = "Curve 1", reverse_prob_direction = FALSE) {
+produce_plot_data <- function(model, age_baseline, kmax, front_k1, tpt2, colour="#02A9EA", name = "Patient 1", reverse_prob_direction = FALSE) {
   new_data <- data.frame(age_baseline=age_baseline, kmax=kmax, front_k1=front_k1, tpt2=tpt2/10)
   dt <- predict(model, newdata=new_data, grid=TRUE, full=TRUE, se.fit=TRUE, ci=TRUE, rug=FALSE)
   dt$colours <- factor(colour)
@@ -634,7 +634,7 @@ produce_plot_data <- function(model, age_baseline, kmax, front_k1, tpt2, colour=
 ui <- fixedPage(
   fixedRow(
     column(6,
-           h4("Curve 1 (blue)", style="color: #02A9EA;"),
+           h4("Patient 1 (blue)", style="color: #02A9EA;"),
            sliderInput("age", "Age at first presentation",
                        min = 13, max = 66, value = 20, width = "100%"),
            sliderInput("kmax", "Kmax",
@@ -645,7 +645,7 @@ ui <- fixedPage(
                        min = 312, max = 605, value = 462, width = "100%"),
     ),
     column(6,
-           h4("Curve 2 (red)", style="color: #EE4266;"),
+           h4("Patient 2 (red)", style="color: #EE4266;"),
            sliderInput("age_2", "Age at first presentation",
                        min = 13, max = 66, value = 20, width = "100%"),
            sliderInput("kmax_2", "Kmax",
@@ -692,8 +692,8 @@ server <- function(input, output, session) {
   })
   
   output$plotly_plot <- renderPlotly({
-    dt1 <- produce_plot_data(model, input$age, input$kmax, input$front_k1, input$tpt, '#02A9EA', "Curve 1")
-    dt2 <- produce_plot_data(model, input$age_2, input$kmax_2, input$front_k1_2, input$tpt_2, '#EE4266', "Curve 2")
+    dt1 <- produce_plot_data(model, input$age, input$kmax, input$front_k1, input$tpt, '#02A9EA', "Patient 1")
+    dt2 <- produce_plot_data(model, input$age_2, input$kmax_2, input$front_k1_2, input$tpt_2, '#EE4266', "Patient 2")
     dt <- rbind(dt1, dt2)
     type <- switch(input$type,
          "original" = ggplot(dt, aes(x = period, y = (1 - Estimate), ymin = lower, ymax = upper, group = names)) + geom_line(aes(colour = names)) + scale_y_continuous(limits=c(0,1)) + scale_color_manual(values = levels(dt$colours), labels = levels(dt$names)) + labs(x = "Years since first appointment", y = "Probability of not having CXL"),
